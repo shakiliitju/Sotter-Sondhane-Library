@@ -1,3 +1,19 @@
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyD6uT8fxuNqu8MDK4z2iJ8QDI9NRbz9k9g",
+  authDomain: "sotter-sondhane-library.firebaseapp.com",
+  databaseURL: "https://sotter-sondhane-library-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "sotter-sondhane-library",
+  storageBucket: "sotter-sondhane-library.firebasestorage.app",
+  messagingSenderId: "941686655138",
+  appId: "1:941686655138:web:f93aa86ea58788513feffb",
+  measurementId: "G-74GWL0ZL0T"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const ADMIN_EMAIL = "shakiljusc15@gmail.com";
+
 const INITIAL_BOOKS = [
   {"no": 1, "title": "কোরআন মাজীদ সহজ সরল বাংলা অনুবাদ", "titleEn": "Al Quran Al-Majeed Easy Plain Bengali Translation", "author": "হাফেজ মুনির উদ্দিন আহমদ", "pub": "আল কোরআন একাডেমী লন্ডন", "pages": 732, "copies": 2, "cat": 0},
   {"no": 2, "title": "আল কুরআন সহজ ভাবানুবাদ", "titleEn": "Al Quran Easy Interpretive Translation", "author": "শাইখ মাহফুজ", "pub": "সার্কেল অব কুরআন", "pages": 750, "copies": 1, "cat": 0},
@@ -794,8 +810,7 @@ const collator = new Intl.Collator(currentLang === "en" ? "en" : "bn");
 
 let favorites = safeJSONParse("ssl_favorites", []);
 let localCovers = safeJSONParse("ssl_covers", {});
-let isAdmin = sessionStorage.getItem("ssl_admin") === "true";
-let getAdminPass = () => localStorage.getItem("ssl_admin_pass") || "#Ssl@2026";
+let isAdmin = false;
 
 const state = {
   q: "",
@@ -820,6 +835,11 @@ window.addEventListener("DOMContentLoaded", () => {
   bindEvents();
   initStorageEventListener(); // Added cross-tab synchronization listener
   initRemoteListener();       // Added database stream hook
+  firebase.auth().onAuthStateChanged(user => {
+    isAdmin = user?.email?.toLowerCase() === ADMIN_EMAIL;
+    updateAdminUI();
+    render();
+  });
   updateAdminUI();
   render();
   updateFavBadge();
@@ -845,26 +865,47 @@ function initStorageEventListener() {
   });
 }
 
-// Remote cloud database listener placeholder (Firebase / Supabase)
 function initRemoteListener() {
-  if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length > 0) {
-    firebase.database().ref('books').on('value', (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        BOOKS = Object.values(data);
-        populateDropdowns();
-        renderStats();
-        render();
-      }
-    });
-  }
+  db.ref('books').on('value', (snapshot) => {
+    const data = snapshot.val();
+    if (data) {
+      BOOKS = Object.values(data);
+      populateDropdowns();
+      renderStats();
+      render();
+    }
+  });
+
+  db.ref('categories').on('value', (snapshot) => {
+    const data = snapshot.val();
+    if (data) {
+      CATS = Object.values(data);
+      populateCategoryDropdown();
+      renderChips();
+      render();
+    }
+  });
+
+  db.ref('covers').on('value', (snapshot) => {
+    localCovers = snapshot.val() || {};
+    localStorage.setItem("ssl_covers", JSON.stringify(localCovers));
+    render();
+    if (curNo !== null) paintDialogCover();
+  });
 }
 
-// Remote cloud sync trigger placeholder
 function syncDataToRemote(path, data) {
-  if (typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length > 0) {
-    firebase.database().ref(path).set(data);
-  }
+  db.ref(path).set(data, (error) => {
+    if (error) {
+      console.error(`Firebase sync failed at /${path}:`, error);
+      const errorCode = error.code || "UNKNOWN_ERROR";
+      showToast(currentLang === "en"
+        ? `Sync failed: ${errorCode}`
+        : `সিন্ক ব্যর্থ: ${errorCode}`);
+    } else {
+      showToast(currentLang === "en" ? "Synced globally!" : "গ্লোবালি আপডেট হয়েছে!");
+    }
+  });
 }
 
 function initScrollToTop() {
@@ -1668,35 +1709,52 @@ function bindEvents() {
     if (passInput) passInput.type = passInput.type === "password" ? "text" : "password";
   });
 
-  $("adminLoginForm")?.addEventListener("submit", e => {
+  $("adminLoginForm")?.addEventListener("submit", async e => {
     e.preventDefault();
+    const email = $("adminEmail")?.value.trim().toLowerCase() || "";
     const passInput = $("adminPass");
     const pass = passInput ? passInput.value : "";
-    if (pass === getAdminPass()) {
+    const errBox = $("adminErrorMsg");
+
+    if (email !== ADMIN_EMAIL) {
+      if (errBox) {
+        errBox.textContent = currentLang === "en" ? "This email is not authorized as an admin." : "এই ইমেইলটি এডমিন হিসেবে অনুমোদিত নয়।";
+        errBox.classList.remove("hidden");
+      }
+      return;
+    }
+
+    try {
+      await firebase.auth().signInWithEmailAndPassword(email, pass);
       isAdmin = true;
-      sessionStorage.setItem("ssl_admin", "true");
       updateAdminUI();
       $("adminDlg")?.close();
-      if (passInput) passInput.value = "";
-      $("adminErrorMsg")?.classList.add("hidden");
+      $("adminLoginForm")?.reset();
+      errBox?.classList.add("hidden");
       showToast(currentLang === "en" ? "Logged in as Admin!" : "এডমিন হিসেবে সফলভাবে লগইন হয়েছে!");
       render();
-    } else {
-      const errBox = $("adminErrorMsg");
+    } catch (error) {
+      console.error("Firebase admin sign-in failed:", error);
       if (errBox) {
-        errBox.textContent = currentLang === "en" ? "Incorrect Password!" : "ভুল পাসওয়ার্ড! আবার চেষ্টা করুন।";
+        const code = error.code || "UNKNOWN_ERROR";
+        errBox.textContent = currentLang === "en" ? `Incorrect Email or Password!: ${code}` : `ভুল ইমেইল বা পাসওয়ার্ড! আবার চেষ্টা করুন।: ${code}`;
         errBox.classList.remove("hidden");
       }
     }
   });
 
-  $("logoutBtn")?.addEventListener("click", () => {
-    isAdmin = false;
-    sessionStorage.removeItem("ssl_admin");
-    updateAdminUI();
-    adminDropdown?.classList.add("hidden");
-    showToast(currentLang === "en" ? "Logged out successfully" : "লগআউট সম্পন্ন হয়েছে");
-    render();
+  $("logoutBtn")?.addEventListener("click", async () => {
+    try {
+      await firebase.auth().signOut();
+      isAdmin = false;
+      updateAdminUI();
+      adminDropdown?.classList.add("hidden");
+      showToast(currentLang === "en" ? "Logged out successfully" : "লগআউট সম্পন্ন হয়েছে");
+      render();
+    } catch (error) {
+      console.error("Firebase admin sign-out failed:", error);
+      showToast(currentLang === "en" ? `Logout failed: ${error.code || "UNKNOWN_ERROR"}` : "লগআউট ব্যর্থ হয়েছে");
+    }
   });
 
   $("adminDashboardBtn")?.addEventListener("click", () => {
@@ -2176,16 +2234,17 @@ function bindEvents() {
   $("changePassCloseBtn")?.addEventListener("click", () => $("changePassDlg")?.close());
   $("changePassCancelBtn")?.addEventListener("click", () => $("changePassDlg")?.close());
 
-  $("changePassForm")?.addEventListener("submit", e => {
+  $("changePassForm")?.addEventListener("submit", async e => {
     e.preventDefault();
     const curr = $("currPass") ? $("currPass").value : "";
     const nPass = $("newPass") ? $("newPass").value : "";
     const conf = $("confirmPass") ? $("confirmPass").value : "";
     const errBox = $("passErrorMsg");
+    const user = firebase.auth().currentUser;
 
-    if (curr !== getAdminPass()) {
+    if (!user || user.email?.toLowerCase() !== ADMIN_EMAIL) {
       if (errBox) {
-        errBox.textContent = currentLang === "en" ? "Current password incorrect!" : "বর্তমান পাসওয়ার্ড সঠিক নয়!";
+        errBox.textContent = currentLang === "en" ? "Please sign in again as admin." : "এডমিন হিসেবে আবার লগইন করুন।";
         errBox.classList.remove("hidden");
       }
       return;
@@ -2199,11 +2258,21 @@ function bindEvents() {
       return;
     }
 
-    localStorage.setItem("ssl_admin_pass", nPass);
-    $("changePassForm")?.reset();
-    errBox?.classList.add("hidden");
-    $("changePassDlg")?.close();
-    showToast(currentLang === "en" ? "Password updated!" : "এডমিন পাসওয়ার্ড সফলভাবে আপডেট করা হয়েছে!");
+    try {
+      const credential = firebase.auth.EmailAuthProvider.credential(user.email, curr);
+      await user.reauthenticateWithCredential(credential);
+      await user.updatePassword(nPass);
+      $("changePassForm")?.reset();
+      errBox?.classList.add("hidden");
+      $("changePassDlg")?.close();
+      showToast(currentLang === "en" ? "Password updated!" : "এডমিন পাসওয়ার্ড সফলভাবে আপডেট করা হয়েছে!");
+    } catch (error) {
+      console.error("Firebase admin password update failed:", error);
+      if (errBox) {
+        errBox.textContent = currentLang === "en" ? `Password update failed: ${error.code || "UNKNOWN_ERROR"}` : `পাসওয়ার্ড আপডেট ব্যর্থ: ${error.code || "UNKNOWN_ERROR"}`;
+        errBox.classList.remove("hidden");
+      }
+    }
   });
 
   $("out")?.addEventListener("click", e => {
