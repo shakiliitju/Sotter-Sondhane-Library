@@ -465,8 +465,8 @@ const PUB_EN_MAP_KEYS = Object.keys(PUB_EN_MAP);
 
 let currentLang = localStorage.getItem("ssl_lang") || "bn";
 
-const INITIAL_CATS_BN = ["আল-কুরআন", "হাদীস ও সুন্নাহ", "আকিদা ও বিশ্বাস", "সীরাতুন্নবী (সা.)", "সালাত ও ইবাদত", "আত্মশুদ্ধি ও জীবনগঠন", "ইসলাম ও সমসাময়িক চিন্তা"];
-const INITIAL_CATS_EN = ["Al-Quran", "Hadith & Sunnah", "Aqeedah & Belief", "Seerat-un-Nabi", "Salat & Worship", "Self-Purification & Life", "Islam & Contemporary Thought"];
+const INITIAL_CATS_BN = ["আল-কুরআন", "হাদীস ও সুন্নাহ", "আকিদা ও বিশ্বাস", "সীরাতুন্নবী (সা.)", "সালাত ও ইবাদত", "আত্মশুদ্ধি ও জীবনগঠন", "ইসলাম ও সমসাময়িক চিন্তা", "গল্প ও উপন্যাস"];
+const INITIAL_CATS_EN = ["Al-Quran", "Hadith & Sunnah", "Aqeedah & Belief", "Seerat-un-Nabi", "Salat & Worship", "Self-Purification & Life", "Islam & Contemporary Thought", "Stories & Novels"];
 
 const I18N = {
   bn: {
@@ -929,7 +929,7 @@ function initScrollToTop() {
 
 function applyLanguageUI() {
   document.documentElement.setAttribute("lang", currentLang);
-  document.title = currentLang === "en" ? "Sotter Sondhane Library" : "সত্যের সন্ধানে লাইব্রেরি | Sotter Sondhane Library";
+  document.title = currentLang === "en" ? "Sotter Sondhane Library" : "সত্যের সন্ধানে লাইব্রেরি";
 
   const langText = $("langText");
   if (langText) langText.textContent = currentLang === "bn" ? "En" : "বাং";
@@ -1044,7 +1044,7 @@ function updateThemeIcon(isDark) {
 }
 
 function trackVisitor() {
-  let totalVisitors = parseInt(localStorage.getItem("ssl_total_visitors") || "1240", 10);
+  let totalVisitors = parseInt(localStorage.getItem("ssl_total_visitors") || "1", 10);
   if (!sessionStorage.getItem("ssl_visited")) {
     sessionStorage.setItem("ssl_visited", "true");
     totalVisitors += 1;
@@ -1737,7 +1737,7 @@ function bindEvents() {
       console.error("Firebase admin sign-in failed:", error);
       if (errBox) {
         const code = error.code || "UNKNOWN_ERROR";
-        errBox.textContent = currentLang === "en" ? `Incorrect Email or Password!: ${code}` : `ভুল ইমেইল বা পাসওয়ার্ড! আবার চেষ্টা করুন।: ${code}`;
+        errBox.textContent = currentLang === "en" ? `Incorrect Email or Password!` : `ভুল ইমেইল বা পাসওয়ার্ড! আবার চেষ্টা করুন।`;
         errBox.classList.remove("hidden");
       }
     }
@@ -1753,7 +1753,7 @@ function bindEvents() {
       render();
     } catch (error) {
       console.error("Firebase admin sign-out failed:", error);
-      showToast(currentLang === "en" ? `Logout failed: ${error.code || "UNKNOWN_ERROR"}` : "লগআউট ব্যর্থ হয়েছে");
+      showToast(currentLang === "en" ? `Logout failed!` : "লগআউট ব্যর্থ হয়েছে");
     }
   });
 
@@ -1769,7 +1769,7 @@ function bindEvents() {
     if ($("dashTotalBorrowers")) $("dashTotalBorrowers").textContent = bn(BORROWERS.filter(x => !x.returned).length);
     
     if ($("dashTotalVisitors")) {
-      $("dashTotalVisitors").textContent = bn(window.sslVisitorCount || localStorage.getItem("ssl_total_visitors") || 1240);
+      $("dashTotalVisitors").textContent = bn(window.sslVisitorCount || localStorage.getItem("ssl_total_visitors") || 1);
     }
 
     const catBreakdownContainer = $("dashCatBreakdown");
@@ -2269,7 +2269,7 @@ function bindEvents() {
     } catch (error) {
       console.error("Firebase admin password update failed:", error);
       if (errBox) {
-        errBox.textContent = currentLang === "en" ? `Password update failed: ${error.code || "UNKNOWN_ERROR"}` : `পাসওয়ার্ড আপডেট ব্যর্থ: ${error.code || "UNKNOWN_ERROR"}`;
+        errBox.textContent = currentLang === "en" ? `Password update failed!` : `পাসওয়ারড আপডেট ব্যর্থ হয়েছে! আবার চেষ্টা করুন।`;
         errBox.classList.remove("hidden");
       }
     }
