@@ -811,6 +811,17 @@ const collator = new Intl.Collator(currentLang === "en" ? "en" : "bn");
 let favorites = safeJSONParse("ssl_favorites", []);
 let localCovers = safeJSONParse("ssl_covers", {});
 let isAdmin = false;
+let localCoversStorageAvailable = true;
+
+function saveLocalCovers() {
+  if (!localCoversStorageAvailable) return;
+  try {
+    localStorage.setItem("ssl_covers", JSON.stringify(localCovers));
+  } catch (error) {
+    localCoversStorageAvailable = false;
+    console.warn("Could not cache book covers in localStorage; continuing with in-memory and Firebase storage.", error);
+  }
+}
 
 const state = {
   q: "",
@@ -888,7 +899,7 @@ function initRemoteListener() {
 
   db.ref('covers').on('value', (snapshot) => {
     localCovers = snapshot.val() || {};
-    localStorage.setItem("ssl_covers", JSON.stringify(localCovers));
+    saveLocalCovers();
     render();
     if (curNo !== null) paintDialogCover();
   });
@@ -2186,7 +2197,7 @@ function bindEvents() {
       if (newBookCoverBase64) {
         localCovers[requestedNo] = newBookCoverBase64;
         if (targetNo !== requestedNo) delete localCovers[targetNo];
-        localStorage.setItem("ssl_covers", JSON.stringify(localCovers));
+        saveLocalCovers();
         syncDataToRemote("covers", localCovers);
       }
 
@@ -2206,7 +2217,7 @@ function bindEvents() {
 
       if (newBookCoverBase64) {
         localCovers[requestedNo] = newBookCoverBase64;
-        localStorage.setItem("ssl_covers", JSON.stringify(localCovers));
+        saveLocalCovers();
         syncDataToRemote("covers", localCovers);
       }
 
@@ -2328,7 +2339,7 @@ function bindEvents() {
       BOOKS = BOOKS.filter(x => x.no !== curNo);
       delete localCovers[curNo];
       saveBooks();
-      localStorage.setItem("ssl_covers", JSON.stringify(localCovers));
+      saveLocalCovers();
       syncDataToRemote("covers", localCovers);
       closeModal();
       populateDropdowns();
